@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>احجز ملعبك</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Almarai:wght@400;700;800&family=Cairo:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --night: #16241c; --night-2: #1e3226;
+    --turf: #3f7d43; --turf-light: #5a9c5c;
+    --chalk: #f4f1e6; --flood: #e8b93a; --clay: #c97a4a;
+    --line: rgba(244,241,230,0.14); --danger: #b3503f;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background: var(--night); color: var(--chalk); font-family: 'Cairo', sans-serif; min-height:100vh;
+    background-image: repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(244,241,230,0.03) 40px),
+      radial-gradient(ellipse at top, rgba(90,156,92,0.18), transparent 60%);
+  }
+  .wrap{ max-width:480px; margin:0 auto; padding:20px 16px 60px; }
+  header.top{ display:flex; align-items:center; justify-content:space-between; padding:6px 2px 22px; border-bottom:1px solid var(--line); margin-bottom:20px; gap:10px; }
+  .brand{ display:flex; flex-direction:column; gap:2px; }
+  .brand .mark{ font-family:'Almarai'; font-weight:800; font-size:26px; letter-spacing:.5px; }
+  .brand .mark span{ color:var(--flood); }
+  .brand .sub{ font-size:12.5px; color:rgba(244,241,230,0.55); }
+  .icon-btn{ background:none; border:1px solid var(--line); color:rgba(244,241,230,0.7); padding:8px 12px; border-radius:8px; font-family:'Cairo'; font-size:12.5px; font-weight:600; cursor:pointer; }
+  nav.tabs{ display:flex; border:1px solid var(--line); border-radius:10px; overflow:hidden; margin-bottom:22px; }
+  nav.tabs button{ flex:1; padding:11px 6px; background:transparent; color:rgba(244,241,230,0.6); border:none; border-left:1px solid var(--line); font-family:'Cairo'; font-weight:600; font-size:14px; cursor:pointer; }
+  nav.tabs button:last-child{ border-left:none; }
+  nav.tabs button.active{ background:var(--turf); color:var(--chalk); }
+  .section-title{ font-family:'Almarai'; font-weight:700; font-size:18px; margin-bottom:12px; display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+  .section-title .count{ font-size:12px; color:rgba(244,241,230,0.45); font-weight:400; font-family:'Cairo'; }
+  .court-card{ border:1px solid var(--line); border-radius:12px; margin-bottom:14px; background:linear-gradient(180deg, rgba(90,156,92,0.06), transparent 60%); overflow:hidden; cursor:pointer; }
+  .court-banner{ height:64px; position:relative; background:repeating-linear-gradient(90deg, var(--turf), var(--turf) 22px, var(--turf-light) 22px, var(--turf-light) 44px); display:flex; align-items:center; justify-content:center; }
+  .court-banner::after{ content:''; position:absolute; inset:8px; border:2px solid rgba(244,241,230,0.5); border-radius:6px; }
+  .court-banner .num{ font-family:'Almarai'; font-weight:800; font-size:26px; z-index:1; text-shadow:0 2px 4px rgba(0,0,0,.3); }
+  .court-body{ padding:12px 14px 14px; }
+  .court-name{ font-family:'Almarai'; font-weight:700; font-size:16.5px; margin-bottom:4px; }
+  .court-meta{ display:flex; justify-content:space-between; align-items:center; font-size:13px; color:rgba(244,241,230,0.6); }
+  .court-price{ color:var(--flood); font-weight:700; }
+  .back-btn{ background:none; border:none; color:var(--chalk); font-family:'Cairo'; font-weight:600; font-size:14px; display:flex; align-items:center; gap:6px; margin-bottom:16px; cursor:pointer; opacity:.8; }
+  .date-scroll{ display:flex; gap:8px; overflow-x:auto; padding-bottom:6px; margin-bottom:18px; }
+  .date-pill{ flex-shrink:0; min-width:58px; text-align:center; padding:9px 4px; border:1px solid var(--line); border-radius:10px; cursor:pointer; font-size:13px; color:rgba(244,241,230,0.65); }
+  .date-pill .d{ font-family:'Almarai'; font-weight:700; font-size:16px; color:var(--chalk); display:block; }
+  .date-pill.active{ background:var(--turf); border-color:var(--turf); }
+  .slots-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .slot{ border:1px solid var(--line); border-radius:10px; padding:14px 8px; text-align:center; cursor:pointer; font-weight:600; font-size:14px; }
+  .slot .time{ display:block; font-size:15px; margin-bottom:3px; }
+  .slot.free{ color:var(--chalk); }
+  .slot.taken{ color:rgba(244,241,230,0.4); cursor:not-allowed; background:rgba(179,80,63,0.08); border-color:rgba(179,80,63,0.25); }
+  .slot.pending{ color:var(--flood); cursor:not-allowed; background:rgba(232,185,58,0.08); border-color:rgba(232,185,58,0.3); }
+  .slot .tag{ font-size:11px; font-weight:400; }
+  .sheet-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.55); display:none; align-items:flex-end; justify-content:center; z-index:50; }
+  .sheet-backdrop.show{ display:flex; }
+  .sheet{ background:var(--night-2); width:100%; max-width:480px; border-radius:18px 18px 0 0; padding:22px 20px 26px; border-top:1px solid var(--line); max-height:88vh; overflow-y:auto; }
+  .sheet h3{ font-family:'Almarai'; font-weight:700; font-size:18px; margin-bottom:4px; }
+  .sheet .detail{ font-size:13px; color:rgba(244,241,230,0.55); margin-bottom:14px; }
+  .field{ margin-bottom:14px; }
+  .field label{ font-size:13px; color:rgba(244,241,230,0.7); display:block; margin-bottom:6px; }
+  .field input{ width:100%; background:rgba(244,241,230,0.06); border:1px solid var(--line); border-radius:9px; padding:12px; color:var(--chalk); font-family:'Cairo'; font-size:15px; }
+  .field input:focus{ outline:none; border-color:var(--turf-light); }
+  .btn-row{ display:flex; gap:10px; margin-top:6px; }
+  .btn{ flex:1; padding:13px; border-radius:9px; border:none; font-family:'Cairo'; font-weight:700; font-size:15px; cursor:pointer; }
+  .btn.primary{ background:var(--turf); color:var(--chalk); }
+  .btn.ghost{ background:transparent; border:1px solid var(--line); color:rgba(244,241,230,0.7); }
+  .err{ color:var(--danger); font-size:12.5px; margin-top:-6px; margin-bottom:10px; display:none; }
+  .toast{ position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:var(--turf); color:var(--chalk); padding:12px 20px; border-radius:10px; font-size:14px; font-weight:600; z-index:60; opacity:0; transition:opacity .25s ease; max-width:90%; text-align:center; }
+  .toast.show{ opacity:1; }
+  .my-item{ border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .my-item .info b{ font-family:'Almarai'; font-size:15px; display:block; margin-bottom:3px; }
+  .my-item .info span{ font-size:12.5px; color:rgba(244,241,230,0.55); }
+  .my-item .cancel{ background:none; border:1px solid rgba(179,80,63,0.5); color:var(--danger); padding:7px 12px; border-radius:8px; font-size:12.5px; font-weight:600; cursor:pointer; flex-shrink:0; }
+  .empty{ text-align:center; padding:40px 20px; color:rgba(244,241,230,0.4); font-size:14px; }
+  .privacy-note{ font-size:11.5px; color:rgba(244,241,230,0.35); margin-top:22px; text-align:center; line-height:1.6; }
+  .badge{ display:inline-block; padding:3px 9px; border-radius:20px; font-size:11.5px; font-weight:700; }
+  .badge.normal{ background:rgba(90,156,92,0.18); color:var(--turf-light); }
+  .badge.provisional{ background:rgba(232,185,58,0.16); color:var(--flood); }
+  .badge.pending{ background:rgba(232,185,58,0.16); color:var(--flood); }
+  .badge.confirmed{ background:rgba(90,156,92,0.18); color:var(--turf-light); }
+  .login-screen{ display:flex; flex-direction:column; align-items:center; padding-top:8vh; }
+  .login-logo{ width:64px; height:64px; border-radius:50%; background:radial-gradient(circle at 35% 30%, var(--flood), var(--clay) 75%); box-shadow:0 0 26px 6px rgba(232,185,58,0.3); margin-bottom:18px; }
+  .login-title{ font-family:'Almarai'; font-weight:800; font-size:24px; margin-bottom:6px; text-align:center; }
+  .login-sub{ font-size:13.5px; color:rgba(244,241,230,0.55); margin-bottom:28px; text-align:center; max-width:280px; }
+  .login-card{ width:100%; }
+  .login-note{ font-size:12px; color:rgba(244,241,230,0.4); text-align:center; margin-top:14px; line-height:1.6; }
+  .pay-box{ border:1px dashed rgba(232,185,58,0.4); border-radius:10px; padding:14px; margin-bottom:16px; background:rgba(232,185,58,0.05); }
+  .pay-box .row{ display:flex; justify-content:space-between; align-items:center; font-size:13.5px; padding:4px 0; }
+  .pay-box .row b{ font-family:'Almarai'; }
+  .acc-value{ display:flex; align-items:center; gap:8px; }
+  .copy-btn{ background:rgba(232,185,58,0.15); border:1px solid rgba(232,185,58,0.4); color:var(--flood); padding:4px 10px; border-radius:6px; font-size:11.5px; font-weight:700; cursor:pointer; flex-shrink:0; }
+  .court-card.closed{ opacity:.5; cursor:not-allowed; }
+  .badge.closed{ background:rgba(179,80,63,0.16); color:var(--danger); }
+  .pay-amount{ font-family:'Almarai'; font-weight:800; font-size:22px; color:var(--flood); text-align:center; margin-bottom:10px; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<div class="sheet-backdrop" id="sheetBackdrop"><div class="sheet" id="sheetContent"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// إعداد Firebase — الصق بيانات مشروعك من Firebase Console هنا
+// (نفس البيانات بالضبط يجب وضعها في ملف لوحة-المشرف.html أيضًا)
+// ============================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyAATE8FjT-Pg2G1lqNlqDEajdqiZY1EGdk",
+  authDomain: "malaeb-shaabiya.firebaseapp.com",
+  projectId: "malaeb-shaabiya",
+  storageBucket: "malaeb-shaabiya.firebasestorage.app",
+  messagingSenderId: "186784756749",
+  appId: "1:186784756749:web:c382ebd1dccc8a26b85144"
+};
+firebase.initializeApp(firebaseConfig);
+const _db = firebase.firestore();
+// تفعيل العمل بدون إنترنت: يخزّن Firestore نسخة محلية بالجهاز (IndexedDB)
+// ويعرضها فورًا حتى بدون اتصال، ثم يزامن أي تغييرات تلقائيًا لحظة عودة الإنترنت.
+try{ _db.enablePersistence({ synchronizeTabs:true }).catch(()=>{}); }catch(e){}
+const _COLLECTION = 'app_data';
+
+// دوال المراقبة اللحظية (real-time) — تُستدعى بدل القراءة لمرة واحدة
+// عندما نريد أن تنعكس أي تغييرات (من تطبيق المشرف أو من مستخدم آخر) فورًا.
+function watchDoc(key, cb){
+  return _db.collection(_COLLECTION).doc(key).onSnapshot(
+    doc => cb(doc.exists ? doc.data().value : null),
+    err => console.warn('watchDoc error', err)
+  );
+}
+function watchPrefix(prefix, cb){
+  let q = _db.collection(_COLLECTION);
+  if(prefix){ q = q.where(firebase.firestore.FieldPath.documentId(), '>=', prefix).where(firebase.firestore.FieldPath.documentId(), '<', prefix+'\uf8ff'); }
+  return q.onSnapshot(
+    snap => cb(snap.docs.map(d=>({ key:d.id, value:d.data().value }))),
+    err => console.warn('watchPrefix error', err)
+  );
+}
+let _activeUnsubs = [];
+function _clearWatchers(){ _activeUnsubs.forEach(u=>{ try{ u(); }catch(e){} }); _activeUnsubs = []; }
+
+window.addEventListener('offline', ()=> showToast('غير متصل بالإنترنت — التطبيق يعمل من آخر بيانات محفوظة وسيُزامن تلقائيًا عند عودة الاتصال'));
+window.addEventListener('online', ()=> showToast('تم الاتصال بالإنترنت — جاري المزامنة...'));
+
+// شبيه (shim) لواجهة window.storage الأصلية، لكن مبني على Firestore
+// بدل تخزين Claude — بقية الكود لا يحتاج أي تعديل لأنه يستخدم نفس الواجهة.
+window.storage = {
+  async get(key, shared){
+    if(!shared){
+      const v = localStorage.getItem('local:'+key);
+      return v ? { key, value:v, shared:false } : null;
+    }
+    const doc = await _db.collection(_COLLECTION).doc(key).get();
+    return doc.exists ? { key, value: doc.data().value, shared:true } : null;
+  },
+  async set(key, value, shared){
+    if(!shared){
+      localStorage.setItem('local:'+key, value);
+      return { key, value, shared:false };
+    }
+    await _db.collection(_COLLECTION).doc(key).set({ value, updatedAt: Date.now() });
+    return { key, value, shared:true };
+  },
+  async delete(key, shared){
+    if(!shared){
+      localStorage.removeItem('local:'+key);
+      return { key, deleted:true, shared:false };
+    }
+    await _db.collection(_COLLECTION).doc(key).delete();
+    return { key, deleted:true, shared:true };
+  },
+  async list(prefix, shared){
+    if(!shared){
+      const keys = []; const p = 'local:'+(prefix||'');
+      for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k && k.indexOf(p)===0) keys.push(k.slice(6)); }
+      return { keys, prefix, shared:false };
+    }
+    let q = _db.collection(_COLLECTION);
+    if(prefix){ q = q.where(firebase.firestore.FieldPath.documentId(), '>=', prefix).where(firebase.firestore.FieldPath.documentId(), '<', prefix+'\uf8ff'); }
+    const snap = await q.get();
+    return { keys: snap.docs.map(d=>d.id), prefix, shared:true };
+  }
+};
+// ============================================================
+// نهاية إعداد Firebase — كل ما يلي هو نفس منطق التطبيق الأصلي
+// ============================================================
+
+const DEFAULT_COURTS = [
+  { id:'c1', name:'ملعب النجوم', area:'حي الزهور', price:60, closed:false },
+  { id:'c2', name:'ملعب الوادي', area:'شارع الجامعة', price:50, closed:false },
+  { id:'c3', name:'ملعب الشباب', area:'حي السلام', price:70, closed:false },
+  { id:'c4', name:'ملعب الحارة', area:'خلف السوق القديم', price:45, closed:false },
+];
+let COURTS = [];
+const TIMES = ['16:00','17:00','18:00','19:00','20:00','21:00','22:00','23:00'];
+const DAY_NAMES = ['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+
+let state = { view:'loading', tab:'browse', selectedCourt:null, selectedDate:null, dates:[], currentUser:null, settings:null };
+
+function buildDates(){
+  const arr = []; const now = new Date();
+  for(let i=0;i<7;i++){
+    const d = new Date(now); d.setDate(now.getDate()+i);
+    arr.push({ key:d.toISOString().slice(0,10), dayNum:d.getDate(), label: i===0?'اليوم':(i===1?'غداً':DAY_NAMES[d.getDay()]) });
+  }
+  state.dates = arr; state.selectedDate = arr[0].key;
+}
+buildDates();
+
+function bookingKey(courtId,date,time){ return `booking:${courtId}:${date}:${time}`; }
+function accountKey(phone){ return `account:${phone}`; }
+function normalizePhone(p){ return p.replace(/[^0-9]/g,''); }
+async function getJson(key, shared){ try{ const r = await window.storage.get(key, shared); return r?JSON.parse(r.value):null; }catch(e){ return null; } }
+async function setJson(key, val, shared){ try{ return await window.storage.set(key, JSON.stringify(val), shared); }catch(e){ return null; } }
+function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2600); }
+
+async function copyToClipboard(text){
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){ await navigator.clipboard.writeText(text); }
+    else {
+      const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+    }
+    showToast('تم نسخ الرقم ✓');
+  }catch(e){ showToast('تعذر النسخ، انسخه يدويًا'); }
+}
+
+async function boot(){
+  let courts = await getJson('config:courts', true);
+  if(!courts){ courts = DEFAULT_COURTS; await setJson('config:courts', courts, true); }
+  COURTS = courts;
+  state.settings = await getJson('config:settings', true) || { depositAmount:50, bankName:'-', accountHolder:'-', accountNumber:'-', extraLabel1:'', extraValue1:'', extraLabel2:'', extraValue2:'' };
+  const session = await getJson('session', false);
+  if(session && session.phone){
+    const acc = await getJson(accountKey(session.phone), true);
+    if(acc){ state.currentUser = acc; state.view='user'; state.tab='browse'; startGlobalMyBookingsWatch(); render(); return; }
+  }
+  state.view = 'login'; render();
+}
+
+function render(){
+  const app = document.getElementById('app');
+  if(state.view==='loading'){ app.innerHTML = `<div class="empty">جاري التحميل...</div>`; return; }
+  if(state.view==='login'){ renderLogin(); return; }
+  if(state.view==='user'){ renderUserApp(); return; }
+}
+
+function renderLogin(){
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="login-screen">
+      <div class="login-logo"></div>
+      <div class="login-title">احجز<span style="color:var(--flood)">ملعبك</span></div>
+      <div class="login-sub">ملاعب شعبية بالحي. سجّل مرة واحدة بالاسم ورقم الهاتف وسيتذكرك الجهاز بعد ذلك.</div>
+      <div class="login-card">
+        <div class="field"><label>الاسم</label><input type="text" id="loginName" placeholder="اكتب اسمك"></div>
+        <div class="field"><label>رقم الهاتف</label><input type="tel" id="loginPhone" placeholder="091xxxxxxx" style="direction:ltr; text-align:right;"></div>
+        <div class="err" id="loginErr">اكتب اسمك ورقم هاتف صحيح</div>
+        <button class="btn primary" style="width:100%;" onclick="doLogin()">دخول</button>
+        <div class="login-note">إذا كان الرقم مسجلاً من قبل، سيتم تسجيل دخولك تلقائيًا بنفس بياناتك.</div>
+      </div>
+    </div>`;
+}
+
+async function doLogin(){
+  const name = document.getElementById('loginName').value.trim();
+  const phone = normalizePhone(document.getElementById('loginPhone').value.trim());
+  const errEl = document.getElementById('loginErr');
+  if(!name || phone.length < 8){ errEl.style.display='block'; return; }
+  errEl.style.display = 'none';
+  let acc = await getJson(accountKey(phone), true);
+  if(!acc){ acc = { phone, name, status:'provisional', createdAt: Date.now() }; await setJson(accountKey(phone), acc, true); }
+  await setJson('session', { phone }, false);
+  state.currentUser = acc; state.view='user'; state.tab='browse'; startGlobalMyBookingsWatch(); render();
+  showToast(`أهلاً ${acc.name} 👋`);
+}
+
+function logout(){
+  window.storage.delete('session', false).catch(()=>{});
+  _clearWatchers();
+  if(_myWatchUnsub){ try{ _myWatchUnsub(); }catch(e){} _myWatchUnsub=null; }
+  _knownAwaiting.clear();
+  state.currentUser=null; state.selectedCourt=null; state.view='login'; render();
+}
+
+async function renderUserApp(){
+  const app = document.getElementById('app');
+  const statusBadge = state.currentUser.status==='normal' ? `<span class="badge normal">حجز عادي</span>` : `<span class="badge provisional">حجز مبدئي (يتطلب إيداع)</span>`;
+  app.innerHTML = `
+    <header class="top">
+      <div class="brand"><div class="mark">احجز<span>ملعبك</span></div><div class="sub">أهلاً ${state.currentUser.name} · ${statusBadge}</div></div>
+      <div><button class="icon-btn" onclick="logout()">خروج</button></div>
+    </header>
+    <nav class="tabs">
+      <button class="${state.tab==='browse'?'active':''}" onclick="setTab('browse')">الملاعب</button>
+      <button class="${state.tab==='mine'?'active':''}" onclick="setTab('mine')">حجوزاتي</button>
+    </nav>
+    <div id="body"></div>
+    <div class="privacy-note">تُخزَّن بيانات الحجز بشكل مشترك حتى يتمكن الجميع من رؤية المواعيد المتاحة والمحجوزة.</div>`;
+  if(state.tab==='browse'){ if(state.selectedCourt) await renderCourtDetail(); else await renderCourtList(); }
+  else { await renderMyBookings(); }
+}
+
+function setTab(tab){ state.tab=tab; state.selectedCourt=null; renderUserApp(); }
+
+async function renderCourtList(){
+  _clearWatchers();
+  const body = document.getElementById('body');
+  body.innerHTML = `<div class="empty">جاري التحميل...</div>`;
+  _activeUnsubs.push(watchDoc('config:courts', (value)=>{
+    if(value){ try{ COURTS = JSON.parse(value); }catch(e){} }
+    paintCourtList();
+  }));
+}
+function paintCourtList(){
+  const body = document.getElementById('body');
+  if(!body) return;
+  body.innerHTML = `
+    <div class="section-title">الملاعب المتاحة <span class="count">${COURTS.length} ملاعب</span></div>
+    ${COURTS.length===0 ? '<div class="empty">لا توجد ملاعب متاحة حاليًا</div>' : COURTS.map((c,idx)=>`
+      <div class="court-card ${c.closed?'closed':''}" onclick="handleCourtClick('${c.id}')">
+        <div class="court-banner"><span class="num">#${idx+1}</span></div>
+        <div class="court-body">
+          <div class="court-name">${c.name} ${c.closed?'<span class="badge closed">مغلق للصيانة</span>':''}</div>
+          <div class="court-meta"><span>${c.area||''}</span><span class="court-price">${c.price} د.ل / ساعة</span></div>
+        </div>
+      </div>`).join('')}`;
+}
+
+function handleCourtClick(id){
+  const c = COURTS.find(x=>x.id===id);
+  if(c && c.closed){ showToast('هذا الملعب مغلق حاليًا للصيانة'); return; }
+  openCourt(id);
+}
+
+async function openCourt(id){ state.selectedCourt=id; state.selectedDate=state.dates[0].key; await renderUserApp(); }
+
+async function renderCourtDetail(){
+  _clearWatchers();
+  const court = COURTS.find(c=>c.id===state.selectedCourt);
+  const body = document.getElementById('body');
+  if(!court){ body.innerHTML = `<div class="empty">هذا الملعب لم يعد موجودًا</div>`; return; }
+  if(court.closed){ body.innerHTML = `<button class="back-btn" onclick="backToList()">→ رجوع للملاعب</button><div class="empty">هذا الملعب مغلق حاليًا للصيانة</div>`; return; }
+  body.innerHTML = `
+    <button class="back-btn" onclick="backToList()">→ رجوع للملاعب</button>
+    <div class="section-title">${court.name} <span class="count">${court.area||''} · ${court.price} د.ل/ساعة</span></div>
+    <div class="date-scroll">
+      ${state.dates.map(d=>`<div class="date-pill ${d.key===state.selectedDate?'active':''}" onclick="pickDate('${d.key}')"><span class="d">${d.dayNum}</span>${d.label}</div>`).join('')}
+    </div>
+    <div class="section-title">المواعيد المتاحة</div>
+    <div class="slots-grid" id="slotsGrid">${TIMES.map(t=>`<div class="slot free"><span class="time">${t}</span><span class="tag">جاري التحميل...</span></div>`).join('')}</div>`;
+  const prefix = `booking:${court.id}:${state.selectedDate}:`;
+  _activeUnsubs.push(watchPrefix(prefix, (items)=>{
+    const bookings = {};
+    items.forEach(it=>{
+      const time = it.key.slice(prefix.length);
+      try{ bookings[time] = JSON.parse(it.value); }catch(e){}
+    });
+    paintSlotsGrid(court, bookings);
+  }));
+}
+function paintSlotsGrid(court, bookings){
+  const grid = document.getElementById('slotsGrid');
+  if(!grid) return;
+  grid.innerHTML = TIMES.map(t=>{
+    const b = bookings[t];
+    if(b){
+      if(b.status==='awaiting_sms') return `<div class="slot pending"><span class="time">${t}</span><span class="tag">قيد المطابقة</span></div>`;
+      return `<div class="slot taken"><span class="time">${t}</span><span class="tag">محجوز</span></div>`;
+    }
+    return `<div class="slot free" onclick="openBookingSheet('${court.id}','${state.selectedDate}','${t}')"><span class="time">${t}</span><span class="tag">متاح</span></div>`;
+  }).join('');
+}
+
+function pickDate(key){ state.selectedDate=key; renderCourtDetail(); }
+function backToList(){ state.selectedCourt=null; renderUserApp(); }
+function closeSheet(){ document.getElementById('sheetBackdrop').classList.remove('show'); }
+
+async function openBookingSheet(courtId, date, time){
+  const court = COURTS.find(c=>c.id===courtId);
+  const dateObj = state.dates.find(d=>d.key===date);
+  const backdrop = document.getElementById('sheetBackdrop');
+  const content = document.getElementById('sheetContent');
+
+  if(state.currentUser.status === 'normal'){
+    content.innerHTML = `
+      <h3>تأكيد الحجز</h3>
+      <div class="detail">${court.name} · ${dateObj.label} (${dateObj.dayNum}) · الساعة ${time}</div>
+      <div class="detail">باسم: ${state.currentUser.name} · ${state.currentUser.phone}</div>
+      <div class="detail" style="color:var(--turf-light);">حسابك مصنّف بحجز عادي (تأكيد فوري بدون إيداع).</div>
+      <div class="btn-row">
+        <button class="btn ghost" onclick="closeSheet()">إلغاء</button>
+        <button class="btn primary" onclick="confirmNormalBooking('${courtId}','${date}','${time}')">تأكيد الحجز</button>
+      </div>`;
+  } else {
+    state.settings = await getJson('config:settings', true) || state.settings;
+    const s = state.settings;
+    content.innerHTML = `
+      <h3>حجز مبدئي — يتطلب إيداع</h3>
+      <div class="detail">${court.name} · ${dateObj.label} (${dateObj.dayNum}) · الساعة ${time}</div>
+      <div class="pay-amount">${s.depositAmount} د.ل</div>
+      <div class="pay-box">
+        <div class="row"><span>البنك</span><b>${s.bankName || '-'}</b></div>
+        <div class="row"><span>اسم صاحب الحساب</span><b>${s.accountHolder || '-'}</b></div>
+        <div class="row"><span>رقم الحساب / IBAN</span><span class="acc-value"><b style="direction:ltr;">${s.accountNumber || '-'}</b>${s.accountNumber ? `<button class="copy-btn" onclick="copyToClipboard('${s.accountNumber}')">نسخ</button>` : ''}</span></div>
+        ${s.extraLabel1 && s.extraValue1 ? `<div class="row"><span>${s.extraLabel1}</span><span class="acc-value"><b style="direction:ltr;">${s.extraValue1}</b><button class="copy-btn" onclick="copyToClipboard('${s.extraValue1}')">نسخ</button></span></div>` : ''}
+        ${s.extraLabel2 && s.extraValue2 ? `<div class="row"><span>${s.extraLabel2}</span><span class="acc-value"><b style="direction:ltr;">${s.extraValue2}</b><button class="copy-btn" onclick="copyToClipboard('${s.extraValue2}')">نسخ</button></span></div>` : ''}
+      </div>
+      <div class="detail">حوّل المبلغ كاملًا على هذه البيانات. بمجرد وصول رسالة البنك، يتأكد حجزك تلقائيًا خلال ثوانٍ دون أي انتظار — فقط اكتب آخر 4 أرقام/حروف من رقم عملية التحويل كما ستظهر في رسالة التأكيد من البنك.</div>
+      <div class="field"><label>آخر 4 أرقام أو حروف من رقم عملية التحويل</label><input type="text" id="refInput" maxlength="4" placeholder="مثال: 8213" style="direction:ltr; text-align:center; letter-spacing:3px; font-weight:700;"></div>
+      <div class="btn-row">
+        <button class="btn ghost" onclick="closeSheet()">إلغاء</button>
+        <button class="btn primary" onclick="confirmDepositBooking('${courtId}','${date}','${time}')">تم التحويل</button>
+      </div>`;
+  }
+  backdrop.classList.add('show');
+}
+
+async function confirmNormalBooking(courtId,date,time){
+  try{
+    const existing = await getJson(bookingKey(courtId,date,time), true);
+    if(existing){ showToast('للأسف تم حجز هذا الموعد قبل قليل'); closeSheet(); renderCourtDetail(); return; }
+    const freshAcc = await getJson(accountKey(state.currentUser.phone), true) || state.currentUser;
+    state.currentUser = freshAcc;
+    await setJson(bookingKey(courtId,date,time), { courtId,date,time, phone:freshAcc.phone, name:freshAcc.name, bookingType:'normal', status:'confirmed', createdAt: Date.now() }, true);
+    closeSheet(); showToast('تم تأكيد حجزك بنجاح ✓'); await renderUserApp();
+  }catch(e){ showToast('حدث خطأ، حاول مرة أخرى'); }
+}
+
+async function confirmDepositBooking(courtId,date,time){
+  try{
+    const last4Ref = (document.getElementById('refInput').value || '').trim().toUpperCase();
+    if(!last4Ref){ showToast('يرجى كتابة آخر 4 أرقام/حروف من رقم عملية التحويل'); return; }
+    const existing = await getJson(bookingKey(courtId,date,time), true);
+    if(existing){ showToast('للأسف تم حجز هذا الموعد قبل قليل'); closeSheet(); renderCourtDetail(); return; }
+    const freshAcc = await getJson(accountKey(state.currentUser.phone), true) || state.currentUser;
+    state.currentUser = freshAcc;
+    await setJson(bookingKey(courtId,date,time), {
+      courtId,date,time, phone:freshAcc.phone, name:freshAcc.name,
+      bookingType:'provisional', status:'awaiting_sms', last4Ref,
+      depositAmount: state.settings.depositAmount, createdAt: Date.now()
+    }, true);
+    closeSheet();
+    showToast('تم استلام طلبك، سيتأكد حجزك تلقائيًا خلال لحظات من وصول التحويل');
+    await renderUserApp();
+  }catch(e){ showToast('حدث خطأ، حاول مرة أخرى'); }
+}
+
+// مراقبة عامة مستمرة (بمعزل عن أي تبويب) تنبّه المستخدم فور تأكيد
+// حجزه المعلّق تلقائيًا عبر مطابقة رسائل البنك — تعمل طول فترة الجلسة.
+let _myWatchUnsub = null;
+let _knownAwaiting = new Set();
+function startGlobalMyBookingsWatch(){
+  if(_myWatchUnsub) return;
+  _myWatchUnsub = watchPrefix('booking:', (items)=>{
+    items.forEach(it=>{
+      let val; try{ val = JSON.parse(it.value); }catch(e){ return; }
+      if(!val || !state.currentUser || val.phone !== state.currentUser.phone) return;
+      if(val.status==='awaiting_sms'){ _knownAwaiting.add(it.key); }
+      else if(val.status==='confirmed' && _knownAwaiting.has(it.key)){
+        _knownAwaiting.delete(it.key);
+        showToast(`تم تأكيد حجزك الساعة ${val.time} تلقائيًا ✓`);
+      }
+    });
+  });
+}
+
+async function renderMyBookings(){
+  _clearWatchers();
+  const body = document.getElementById('body');
+  body.innerHTML = `<div class="section-title">حجوزاتي</div><div id="myList"><div class="empty">جاري التحميل...</div></div>`;
+  _activeUnsubs.push(watchPrefix('booking:', (items)=>{
+    const matches = [];
+    items.forEach(it=>{
+      try{ const val = JSON.parse(it.value); if(val.phone===state.currentUser.phone) matches.push({key:it.key, ...val}); }catch(e){}
+    });
+    matches.sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+    paintMyBookings(matches);
+  }));
+}
+function paintMyBookings(matches){
+  const listEl = document.getElementById('myList');
+  if(!listEl) return;
+  if(matches.length===0){ listEl.innerHTML = `<div class="empty">لم يتم إجراء أي حجز بعد</div>`; return; }
+  listEl.innerHTML = matches.map(m=>{
+    const court = COURTS.find(c=>c.id===m.courtId);
+    const dObj = state.dates.find(d=>d.key===m.date);
+    const dateLabel = dObj ? `${dObj.label} (${dObj.dayNum})` : m.date;
+    const badge = m.status==='awaiting_sms' ? `<span class="badge pending">بانتظار المطابقة التلقائية</span>` : (m.bookingType==='provisional' ? `<span class="badge confirmed">مبدئي مؤكد</span>` : `<span class="badge normal">عادي</span>`);
+    return `
+      <div class="my-item">
+        <div class="info"><b>${court?court.name:m.courtId} ${badge}</b><span>${dateLabel} · الساعة ${m.time}</span></div>
+        <button class="cancel" onclick="cancelMyBooking('${m.key}')">إلغاء</button>
+      </div>`;
+  }).join('');
+}
+
+async function cancelMyBooking(key){
+  try{ await window.storage.delete(key, true); showToast('تم إلغاء الحجز'); await renderMyBookings(); }
+  catch(e){ showToast('تعذر إلغاء الحجز، حاول مرة أخرى'); }
+}
+
+boot();
+</script>
+</body>
+</html>
