@@ -63,7 +63,7 @@ async function setJson(key, val){
 }
 
 // غيّر هذه الكلمة لكلمة سر خاصة فيك أنت فقط — هذا التطبيق يتحكم بكل شي
-const ahmed2004eng = 'غيّر_هذه_الكلمة';
+const MASTER_PASSWORD = 'ahmed2004eng';
 
 let state = { loggedIn:false };
 const toastEl = document.getElementById('toast');
@@ -83,7 +83,11 @@ function daysSinceDate(dateStr){
 }
 async function getLicense(){
   const lic = await getJson('license:info');
-  if(!lic) return { adminCode:'admin2026', renewedDate: localDateStr(), active:true, daysLeft:30 };
+  if(!lic){
+    const fresh = { adminCode:'admin2026', renewedDate: localDateStr(), active:true };
+    await setJson('license:info', fresh);
+    return { ...fresh, daysLeft:30 };
+  }
   const daysElapsed = daysSinceDate(lic.renewedDate);
   const daysLeft = lic.active===false ? 0 : Math.max(0, 30 - daysElapsed);
   return { ...lic, daysLeft };
